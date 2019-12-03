@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<title>Relative Pitch</title>
+<style type="text/css">
+#row_type, #row_play, #row_answer, #row_result {
+	text-align: center;
+	margin: 10px 0;
+}
+
+#box_dist, #box_cent {
+	display: inline-block;
+	width: 400px;
+	padding: 10px;
+
+	border: #eee 3px solid;
+	border-radius: 5px;
+
+	font-size: 24px;
+	font-weight: bold;
+	font-family: sans-serif;
+}
+
+#tbl_dist, #tbl_cent {
+	margin-top: 10px;
+	display: inline-block;
+	text-align: left;
+}
+
+#tbl_dist td, #tbl_cent td {
+	width: 120px;
+	height: 50px;
+	padding: 0px;
+	text-align: center;
+	display: inline-block;
+}
+
+#tbl_dist td a, #tbl_cent td a {
+	display: inline-block;
+	vertical-align: middle;
+	
+	width: 100px;
+	height: 40px;
+	border-radius: 5px;
+	border: #bbb 3px solid;
+	background-color: #ddd;
+
+	font-size: 16px;
+	font-weight: normal;
+	line-height: 40px;
+
+	transition: border 0.3s;
+}
+
+#tbl_dist td a:hover, #tbl_cent td a:hover {
+	border: #888 3px solid;
+}
+
+#tbl_dist td a.selected, #tbl_cent td a.selected {
+	background-color: #cde;
+}
+
+#btn_low, #btn_high {
+	display: inline-block;
+	width: 80px;
+	height: 80px;
+
+	background-color: #eee;
+	border: #eee 3px solid;
+	border-radius: 3px;
+
+	text-align: center;
+	font-size: 36px;
+	line-height: 80px;
+	font-family: monospace;
+
+	margin: 0 10px;
+
+	transition: border .2s;
+}
+
+#btn_low:hover, #btn_high:hover {
+	border: #888 3px solid;
+}
+
+.btn_ans {
+	display: inline-block;
+	width: 80px;
+	height: 80px;
+
+	border: #eee 3px solid;
+	border-radius: 3px;
+
+	text-align: center;
+	font-size: 20px;
+	line-height: 40px;
+	color: #000;
+
+	margin: 0 10px;
+
+	transition: border .2s;
+}
+
+.btn_ans:hover {
+	border: #888 3px solid;
+}
+.btn_ans0 {
+	background-color: #dee;
+}
+.btn_ans1 {
+	background-color: #ede;
+}
+.btn_ans2 {
+	background-color: #eed;
+}
+
+#row_answer .btn_ans_selected {
+	border: #eaa 3px solid;
+}
+#row_answer .btn_ans_correct {
+	border: #9c9 3px solid;
+}
+
+
+.btn_selected {
+	border: #22e 3px solid;
+}
+
+#txt_result {
+	display: inline-block;
+	width: 300px;
+	height: 80px;
+	padding: 20px;
+
+	background-color: #eee;
+	border-radius: 5px;
+
+	font-size: 20px;
+	font-family: monospace;
+	text-align: left;
+}
+
+#btn_newgame {
+	display: inline-block;
+	width: 200px;
+	height: 50px;
+	margin-top: 20px;
+
+	border-radius: 5px;
+
+	background-color: #333;
+
+	color: white;
+	font-size: 20px;
+	line-height: 50px;
+	font-family: serif;
+
+	transition: background-color .5s;
+}
+#btn_newgame:hover {
+	background-color: #777;
+	/*border: #bbb 3px solid;*/
+}
+
+</style>
+</head>
+
+<body>
+
+<div id="row_type">
+<div id="box_dist">음 간격<br>
+<table id="tbl_dist">
+<tr>
+<td><a id="btn_dist7">완전5도 (7)</a></td>
+<td><a id="btn_dist5">완전4도 (5)</a></td>
+</tr>
+<tr>
+<td><a id="btn_dist3">장3도 (4)</a></td>
+<td><a id="btn_dist9">장6도 (9)</a></td>
+</tr>
+</table>
+</div>
+<div id="box_cent">음 차이<br>
+<table id="tbl_cent">
+<tr>
+<td><a id="btn_cent50">50 cents</a></td>
+<td><a id="btn_cent30">30 cents</a></td>
+<td><a id="btn_cent20">20 cents</a></td>
+</tr>
+<tr>
+<td><a id="btn_cent10">10 cents</a></td>
+<td><a id="btn_cent5">5 cents</a></td>
+<td><a id="btn_cent1">1 cent</a></td>
+</tr>
+</table>
+</div>
+</div>
+
+<div id="row_play">
+<div id="btn_low">lo</div>
+<div id="btn_high">hi</div>
+</div>
+
+<div id="row_answer">
+<div id="btn_ans0" class="btn_ans btn_ans0">narrow<br>&gt;&lt;</div>
+<div id="btn_ans1" class="btn_ans btn_ans1">just<br>|&nbsp;|</div>
+<div id="btn_ans2" class="btn_ans btn_ans2">wide<br>&lt;&gt;</div>
+</div>
+
+<div id="row_result">
+<div id="txt_result"></div><br>
+<div id="btn_newgame">new game</div>
+</div>
+
+
+<script type="text/javascript">
+$=function(x){return document.getElementById(x);};
+
+var AudioContext = window.AudioContext || window.webkitAudioContext;
+var audioCtx = new AudioContext();
+
+var baseFreq = 442;
+
+class nd {
+  constructor() {
+  	var node = audioCtx.createOscillator();
+  	node.frequency.setValueAtTime(440, audioCtx.currentTime);
+  	node.type = "triangle";
+
+  	var gain = audioCtx.createGain();
+  	gain.gain.setValueAtTime(0, audioCtx.currentTime);
+
+  	node.connect(gain);
+  	gain.connect(audioCtx.destination);
+
+  	node.start();
+
+  	this.step = 0;
+  	this.cent = 0;
+  	this.node = node;
+  	this.gain = gain;
+  }
+
+  getActualFreq() {
+  	return baseFreq * Math.pow(2, (this.step/12.0) + (this.cent/1200.0));
+  }
+
+  setFreq(step, cent) {
+  	this.step = step;
+  	this.cent = cent;
+
+  	var t = audioCtx.currentTime;
+
+  	this.node.frequency.setValueAtTime(this.getActualFreq(), t);
+  }
+
+  hit() {
+  	var t = audioCtx.currentTime;
+  	this.gain.gain.cancelScheduledValues(t);
+  	this.gain.gain.linearRampToValueAtTime(1.0, t+0.01);
+  	this.gain.gain.exponentialRampToValueAtTime(1e-5, t+5.00);
+  	this.gain.gain.setValueAtTime(0, t+5.01);
+  }
+
+  mute() {
+  	var t = audioCtx.currentTime;
+  	this.gain.gain.cancelScheduledValues(t);
+  	this.gain.gain.setValueAtTime(0, t);
+  }
+
+  on() {
+  	var t = audioCtx.currentTime;
+  	this.gain.gain.cancelScheduledValues(t);
+  	this.gain.gain.setValueAtTime(1, t);
+  }
+};
+
+var dist = 7;
+var cent = 30;
+var ans = 0;
+var answered = false;
+
+const upper_octave = 2;
+const lower_octave = 3;
+const list_dist = [3, 5, 7, 9];
+const list_cent = [50, 30, 20, 10, 5, 1];
+
+var nd_low = new nd();
+var nd_high = new nd();
+
+var btn_low = $("btn_low");
+var btn_high = $("btn_high");
+btn_low.onclick = function(e){ nd_low.hit(); };
+btn_high.onclick = function(e){ nd_high.hit(); };
+
+function rand_int(lo, hi) {
+	return lo + Math.floor(Math.random() * (hi-lo+1));
+}
+
+function new_game() {
+	nd_low.mute();
+	nd_high.mute();
+	answered = false;
+
+	[0, 1, 2].forEach(x => $("btn_ans"+x).classList.remove("btn_ans_selected", "btn_ans_correct"));
+	$("txt_result").innerText = "";
+
+	var step_lo = rand_int(-12*lower_octave, +12*upper_octave-dist);
+	var step_hi = step_lo + dist;
+
+	var cent_lo = 0, cent_hi = 0;
+
+	ans = rand_int(0, 2);
+
+	if (rand_int(0, 1)) {
+		cent_lo = cent * [1, 0, -1][ans];
+	} else {
+		cent_hi = cent * [-1, 0, 1][ans];
+	}
+
+	nd_low.setFreq(step_lo, cent_lo);
+	nd_high.setFreq(step_hi, cent_hi);
+}
+
+var trials = 0;
+var succ = 0;
+
+list_dist.forEach(x => $("btn_dist"+x).onclick = function(e) {
+	$("btn_dist"+dist).classList.remove("selected");
+	dist = x;
+	$("btn_dist"+dist).classList.add("selected");
+	trials = 0;
+	succ = 0;
+	new_game();
+});
+
+list_cent.forEach(x => $("btn_cent"+x).onclick = function(e) {
+	$("btn_cent"+cent).classList.remove("selected");
+	cent = x;
+	$("btn_cent"+cent).classList.add("selected");
+	trials = 0;
+	succ = 0;
+	new_game();
+});
+
+$("btn_dist"+dist).classList.add("selected");
+$("btn_cent"+cent).classList.add("selected");
+
+function try_answer(x) {
+	answered = true;
+
+	++trials;
+	if (x == ans) ++succ;
+
+	$("btn_ans"+x).classList.add("btn_ans_selected");
+	$("btn_ans"+ans).classList.add("btn_ans_correct");
+
+	step_to_note = function(x) {
+		x -= 3;
+
+		r = (x%12+12)%12;
+		oct = 5 + (x - r)/12;
+		return [
+			" C", "C#", " D", "D#",
+			" E", " F", "F#", " G",
+			"G#", " A", "A#", " B"
+		][r] + oct;
+	};
+
+	cent_to_note = function(x) {
+		if (x == 0)
+			return "just";
+		else if (x > 0)
+			return "+" + (""+x).padStart(2) + " cent" + (x>1 ? "s" : "");
+		else
+			return "-" + (""+-x).padStart(2) + " cent" + (x>1 ? "s" : "");
+	};
+
+	var res = "";
+	res += "Low : " + step_to_note(nd_low.step) + " " + cent_to_note(nd_low.cent)
+	     + "\n"
+	     + "High: " + step_to_note(nd_high.step) + " " + cent_to_note(nd_high.cent)
+	     + "\n"
+	     + succ + "/" + trials + " (" + ((succ*100.0/trials).toFixed(3)) + "%)";
+
+	$("txt_result").innerText = res;
+}
+
+[0, 1, 2].forEach(x => $("btn_ans"+x).onclick = function(e) {
+	if (answered) {
+		new_game();
+	} else {
+		try_answer(x);
+	}
+});
+
+$("btn_newgame").onclick = (e => new_game());
+
+new_game();
+
+var shortcuts = {
+	",": $("btn_low").onclick,
+	".": $("btn_high").onclick,
+	"1": $("btn_ans0").onclick,
+	"2": $("btn_ans1").onclick,
+	"3": $("btn_ans2").onclick
+};
+
+var downs = new Set();
+
+shortcuts["p"] = (() => node.hit());
+document.body.onkeydown = function(e) {
+	if (downs.has(e.key)) return;
+	if (e.key in shortcuts) {
+		shortcuts[e.key]();
+	}
+};
+document.body.onkeyup = function(e) {
+	downs.delete(e.key);
+};
+
+
+</script>
+</body>
+
+</html>

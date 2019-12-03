@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<title>Absolute Pitch</title>
+<style type="text/css">
+
+#row_play, #row_answer, #row_result {
+	text-align: center;
+	margin: 10px 0;
+}
+
+.btn-play {
+	display: inline-block;
+	width: 100px;
+	height: 100px;
+
+	background-color: #eee;
+
+	border-radius: 5px;
+
+	line-height: 100px;
+	font-size: 36px;
+	color: #000;
+}
+
+#box_piano {
+	position: relative;
+	
+	display: inline-block;
+	width: 374px;
+	height: 200px;
+
+	border-left: #aaa 6px solid;
+	border-right: #aaa 6px solid;
+	border-bottom: #aaa 10px solid;
+
+	background-color: #aaa;
+}
+
+.piano-note {
+	position: absolute;
+	display: inline-block;
+
+	width: 50px;
+
+	top: 0px;
+	left: 0px;
+}
+
+.piano-black {
+	background-color: #222;
+}
+.piano-white {
+	background-color: #f0f0f0;
+}
+.piano-selected {
+	background-color: #ff8888;
+}
+.piano-correct {
+	background-color: #88ff88;
+}
+
+
+.text-answer {
+	display: inline-block;
+	width: 300px;
+	height: 80px;
+	padding: 20px;
+
+	background-color: #eee;
+	border-radius: 5px;
+
+	font-size: 20px;
+	font-family: monospace;
+	text-align: left;
+}
+
+.btn-newgame {
+	display: inline-block;
+	width: 200px;
+	height: 50px;
+	margin-top: 20px;
+
+	border-radius: 5px;
+
+	background-color: #333;
+
+	color: white;
+	font-size: 20px;
+	line-height: 50px;
+	font-family: serif;
+
+	transition: background-color .5s;
+}
+.btn-newgame:hover {
+	background-color: #777;
+	/*border: #bbb 3px solid;*/
+}
+
+</style>
+</head>
+
+<body>
+
+<div id="row_play">
+<div id="btn_play" class="btn-play">▶</div>
+</div>
+
+<div id="row_answer">
+<div id="box_piano">
+	
+</div>
+</div>
+
+<div id="row_result">
+<div id="txt_result" class="text-answer"></div><br>
+<div id="btn_newgame" class="btn-newgame">new game</div>
+</div>
+
+
+<script type="text/javascript">
+$=function(x){return document.getElementById(x);};
+
+var AudioContext = window.AudioContext || window.webkitAudioContext;
+var audioCtx = new AudioContext();
+
+var baseFreq = 442;
+
+class nd {
+  constructor() {
+  	var node = audioCtx.createOscillator();
+  	node.frequency.setValueAtTime(440, audioCtx.currentTime);
+  	node.type = "triangle";
+
+  	var gain = audioCtx.createGain();
+  	gain.gain.setValueAtTime(0, audioCtx.currentTime);
+
+  	node.connect(gain);
+  	gain.connect(audioCtx.destination);
+
+  	node.start();
+
+  	this.step = 0;
+  	this.cent = 0;
+  	this.node = node;
+  	this.gain = gain;
+  }
+
+  getActualFreq() {
+  	return baseFreq * Math.pow(2, (this.step/12.0) + (this.cent/1200.0));
+  }
+
+  setFreq(step, cent) {
+  	this.step = step;
+  	this.cent = cent;
+
+  	var t = audioCtx.currentTime;
+
+  	this.node.frequency.setValueAtTime(this.getActualFreq(), t);
+  }
+
+  hit() {
+  	var t = audioCtx.currentTime;
+  	this.gain.gain.cancelScheduledValues(t);
+  	this.gain.gain.linearRampToValueAtTime(1.0, t+0.01);
+  	this.gain.gain.exponentialRampToValueAtTime(1e-5, t+5.00);
+  	this.gain.gain.setValueAtTime(0, t+5.01);
+  }
+
+  mute() {
+  	var t = audioCtx.currentTime;
+  	this.gain.gain.cancelScheduledValues(t);
+  	this.gain.gain.setValueAtTime(0, t);
+  }
+
+  on() {
+  	var t = audioCtx.currentTime;
+  	this.gain.gain.cancelScheduledValues(t);
+  	this.gain.gain.setValueAtTime(1, t);
+  }
+};
+
+var ans = 0;
+var answered = false;
+const keys = [
+	[0, 0], // C
+	[1, 0], // D
+	[2, 0], // E
+	[3, 0], // F
+	[4, 0], // G
+	[5, 0], // A
+	[6, 0], // B
+	[0, 1], // C#
+	[1, 1], // D#
+	[3, 1], // F#
+	[4, 1], // G#
+	[5, 1], // A#
+];
+const keyremap = [0, 7, 1, 8, 2, 3, 9, 4, 10, 5, 11, 6];
+const key_width = 54;
+const key_long = 200;
+const key_short = 120;
+
+const upper_octave = 2;
+const lower_octave = 3;
+
+var node = new nd();
+
+$("btn_play").onclick = (e => node.hit());
+
+function rand_int(lo, hi) {
+	return lo + Math.floor(Math.random() * (hi-lo+1));
+}
+
+function new_game() {
+	node.mute();
+	answered = false;
+
+	$("txt_result").innerText = "";
+	for (var i = 0; i < 12; ++i)
+		$("btn_key"+i).classList.remove("piano-selected", "piano-correct");
+
+	for(;;){
+		var tmp = rand_int(-12*lower_octave, +12*upper_octave);
+		if ((ans%12+12)%12 == (tmp%12+12)%12) continue;
+		ans = tmp;
+		break;
+	}
+
+	node.setFreq(ans, 0);
+}
+
+var trials = 0;
+var succ = 0;
+
+function try_answer(x) {
+	answered = true;
+
+	$("btn_key"+x).classList.add("piano-selected");
+	$("btn_key"+keyremap[(ans%12+21)%12]).classList.add("piano-correct");
+	++trials;
+	if (x == keyremap[(ans%12+21)%12])
+		++succ;
+
+	step_to_note = function(x) {
+		x -= 3;
+
+		r = (x%12+12)%12;
+		oct = 5 + (x - r)/12;
+		return [
+			" C", "C#", " D", "D#",
+			" E", " F", "F#", " G",
+			"G#", " A", "A#", " B"
+		][r] + oct;
+	};
+
+	var res = "";
+	res += "Answer: " + step_to_note(ans)
+		 + "\n"
+		 + succ + "/" + trials + " (" + ((succ*100.0/trials).toFixed(3)) + "%)";
+
+	$("txt_result").innerText = res;
+}
+
+var shortcuts = {};
+
+for (var i = 0; i < 12; ++i) {
+	var elem = document.createElement("div");
+	var pos = keys[i][0];
+	var col = keys[i][1];
+
+	elem.id = "btn_key" + i;
+	elem.classList.add("piano-note");
+	elem.classList.add(col ? "piano-black" : "piano-white");
+
+	shortcuts["asdfghjwetyu"[i]] = elem.onclick = (j=>function(e) {
+		if (answered) {
+			new_game();
+		} else {
+			try_answer(j);
+		}
+	})(i);
+
+	var left = key_width * pos;
+	var top = 0;
+	var height = key_long;
+	if (col) {
+		left += key_width / 2;
+		height = key_short;
+		elem.style.setProperty("color", "white");
+	}
+
+	elem.innerText = "asdfghjwetyu"[i];
+	elem.style.setProperty("left", left + "px");
+	elem.style.setProperty("height", height + "px");
+	elem.style.setProperty("line-height", (height*1.5) + "px");
+	console.log(elem.style);
+
+	$("box_piano").appendChild(elem);
+}
+
+$("btn_newgame").onclick = (e => new_game());
+
+new_game();
+
+var downs = new Set();
+
+shortcuts["p"] = (() => node.hit());
+document.body.onkeydown = function(e) {
+	if (downs.has(e.key)) return;
+	if (e.key in shortcuts) {
+		shortcuts[e.key]();
+	}
+};
+document.body.onkeyup = function(e) {
+	downs.delete(e.key);
+};
+
+</script>
+</body>
+
+</html>
